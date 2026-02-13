@@ -60,54 +60,63 @@ app.post("/write-test", (req, res) => {
 });
 
 // ------------------------------------------------------------
-// 本命：ガチャ保存（分割保存）
+// 本命：ガチャ保存（分割保存 + user/fileId 階層 + overwrite判定）
 // POST /write-gacha
 // body: {
+//   fileId: "xxxx",      // ユーザー識別（フォルダ名）
 //   gachaId: "gacha01",
-//   selecMode: 0,
-//   selectBody: "...",
-//   selectBack: "...",
-//   option: {...},
-//   gachaData: [...]
+//   meta: { selecMode, selectBody, selectBack, option },
+//   gacha: { selecMode, gachaData }
 // }
 // ------------------------------------------------------------
 app.post("/write-gacha", (req, res) => {
 	try {
 		const body = req.body || {};
 
+		const fileId = body.fileId;
 		const gachaId = body.gachaId;
+
+		if (!fileId) {
+			res.status(400).json({ ok: false, error: "fileId is required" });
+			return;
+		}
 		if (!gachaId) {
 			res.status(400).json({ ok: false, error: "gachaId is required" });
 			return;
 		}
 
-		// 保存先フォルダ
-		const baseDir = path.join(__dirname, "data");
-		const metaDir = path.join(baseDir, "meta");
-		const gachaDir = path.join(baseDir, "gacha");
-		ensureDir(metaDir);
-		ensureDir(gachaDir);
+		// meta / gacha を取り出す（ネスト想定）
+		const metaIn = body.meta || {};
+		const gachaIn = body.gacha || {};
 
-		// 分割データ
-		const meta = {
-			gachaId: gachaId,
-			selecMode: body.selecMode,
-			selectBody: body.selectBody,
-			selectBack: body.selectBack,
-			option: body.option || {}
-		};
+		// 最低限チェック
+		const selecMode = metaIn.selecMode;
+		const gachaData = gachaIn.gachaData;
 
-		const gacha = {
-			gachaId: gachaId,
-			gachaData: Array.isArray(body.gachaData) ? body.gachaData : []
-		};
+		if (selecMode == null) {
+			res.status(400).json({ ok: false, error: "meta.selecMode is required" });
+			return;
+		}
+		if (!Array.isArray(gachaData)) {
+			res.status(400).json({ ok: false, error: "gacha.gachaData must be array" });
+			return;
+		}
 
-		// 保存
-		const metaPath = path.join(metaDir, `${gachaId}.json`);
-		const gachaPath = path.join(gachaDir, `${gachaId}.json`);
+		// 保存先（users/fileId/gachaId/）
+		const baseDir = path.join(__dirname, "data", "users", String(fileId), String(gachaId));
+		ensureDir(baseDir);
 
-		saveJson(metaPath, meta);
-		saveJson(gachaPath, gacha);
+		const metaPath = path.join(baseDir, "meta.json");
+		const gachaPath = path.join(baseDir, "gacha.json");
+
+		// 追加：保存前に存在してたか（＝上書きになるか）
+		const metaExists = fs.existsSync(metaPath);
+		const gachaExists = fs.existsSync(gachaPath);
+		const overwrite = (metaExists || gachaExists);
+
+		// あれば上書き / なければ新規作成
+		saveJson(metaPath, metaIn);
+		saveJson(gachaPath, gachaIn);
 
 		console.log("Saved meta:", metaPath);
 		console.log("Saved gacha:", gachaPath);
@@ -115,8 +124,9 @@ app.post("/write-gacha", (req, res) => {
 		res.json({
 			ok: true,
 			saved: true,
-			metaFile: `meta/${gachaId}.json`,
-			gachaFile: `gacha/${gachaId}.json`
+			overwrite: overwrite,
+			metaFile: `users/${fileId}/${gachaId}/meta.json`,
+			gachaFile: `users/${fileId}/${gachaId}/gacha.json`
 		});
 	} catch (e) {
 		console.error("Write gacha error:", e);
