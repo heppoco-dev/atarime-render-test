@@ -1,40 +1,34 @@
 const express = require("express");
+const cors = require("cors");
+
 const app = express();
 
-// JSONを受け取れるようにする
+// ------------------------------------------------------------
+// CORS（まずはテスト用に全許可）
+// 本番では origin を絞る想定
+// ------------------------------------------------------------
+app.use(cors({
+	origin: "*",
+	methods: ["GET", "POST", "OPTIONS"],
+	allowedHeaders: ["Content-Type"]
+}));
+
+// preflight を明示的に返す（環境によって必要になる）
+app.options("*", cors());
+
 app.use(express.json());
 
-/* =========================
-   ルート確認
-========================= */
 app.get("/", (req, res) => {
-  res.send("Node server is running!");
+	res.send("Node server is running!");
 });
 
-/* =========================
-   GET確認用（ブラウザで直接確認）
-========================= */
-app.get("/write-test", (req, res) => {
-  res.send("POSTで /write-test にJSONを送ってください");
-});
-
-/* =========================
-   書き込みテスト（POST）
-========================= */
 app.post("/write-test", (req, res) => {
-  console.log("Received:", req.body);
-
-  res.json({
-    ok: true,
-    received: req.body
-  });
+	console.log("Received:", req.body);
+	res.json({ ok: true, received: req.body });
 });
 
-/* =========================
-   サーバー起動
-========================= */
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("Server started on port", PORT);
+	console.log("Server started on port", PORT);
 });
