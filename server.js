@@ -138,3 +138,52 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
 	console.log("Server started on port", PORT);
 });
+
+
+
+
+
+
+// ------------------------------------------------------------
+// 読み込み：ガチャ取得（実感用）
+// GET /get-gacha?fileId=xxx&gachaId=gacha01
+// ------------------------------------------------------------
+app.get("/get-gacha", (req, res) => {
+	try {
+		const fileId = req.query.fileId;
+		const gachaId = req.query.gachaId;
+
+		if (!fileId) {
+			res.status(400).json({ ok: false, error: "fileId is required" });
+			return;
+		}
+		if (!gachaId) {
+			res.status(400).json({ ok: false, error: "gachaId is required" });
+			return;
+		}
+
+		const baseDir = path.join(__dirname, "data", "users", String(fileId), String(gachaId));
+		const metaPath = path.join(baseDir, "meta.json");
+		const gachaPath = path.join(baseDir, "gacha.json");
+
+		if (!fs.existsSync(metaPath) || !fs.existsSync(gachaPath)) {
+			res.status(404).json({ ok: false, error: "not found" });
+			return;
+		}
+
+		const meta = JSON.parse(fs.readFileSync(metaPath, "utf8"));
+		const gacha = JSON.parse(fs.readFileSync(gachaPath, "utf8"));
+
+		res.json({
+			ok: true,
+			fileId: String(fileId),
+			gachaId: String(gachaId),
+			meta: meta,
+			gacha: gacha
+		});
+	} catch (e) {
+		console.error("Get gacha error:", e);
+		res.status(500).json({ ok: false, error: String(e) });
+	}
+});
+
